@@ -1,7 +1,7 @@
 /**
  * Hide Trips Map Button Action - FINAL VERSION
  * Specifically targets MyGeotab Trips History map panel
- * Based on detected selector: .react-trips-history__map-panel
+ * Waits for page to load and tries multiple selectors
  */
 
 geotab.customButtons.hideTripsMap = function(event, api, state) {
@@ -12,44 +12,84 @@ geotab.customButtons.hideTripsMap = function(event, api, state) {
         window.geotabMapHidden = false;
     }
 
-    // Find the map panel using the specific selector
-    const mapPanel = document.querySelector('.react-trips-history__map-panel');
+    // Try multiple selectors based on detected structure
+    function findMapPanel() {
+        const selectors = [
+            '.react-trips-history__map-panel',
+            '.react-trips-history__map-container',
+            '#liveMap_mapCanvas',
+            '.map-with-options',
+            'div[class*="react-trips-history__map"]'
+        ];
 
-    if (!mapPanel) {
-        console.error('Map panel not found!');
-        alert('Map panel not found. Please make sure you are on the Trips History page.');
-        return;
+        for (let selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                console.log('Map found with selector:', selector);
+                return element;
+            }
+        }
+
+        return null;
     }
 
-    console.log('Map panel found:', mapPanel);
+    // Find the map panel
+    let mapPanel = findMapPanel();
 
-    // Toggle visibility
-    if (window.geotabMapHidden) {
-        // Show map
-        mapPanel.style.display = '';
-        window.geotabMapHidden = false;
+    // If not found, wait a bit and try again (page might still be loading)
+    if (!mapPanel) {
+        console.log('Map not found immediately, waiting for page load...');
 
-        // Save preference
-        try {
-            localStorage.setItem('hideTripsMap_state', 'visible');
-        } catch (e) {
-            console.warn('Could not save state:', e);
+        setTimeout(function() {
+            mapPanel = findMapPanel();
+
+            if (!mapPanel) {
+                console.error('Map panel still not found after waiting!');
+                alert('Map panel not found. Please wait for the page to fully load and try again.');
+                return;
+            }
+
+            // Found it after waiting, now toggle
+            toggleMap(mapPanel);
+        }, 500);
+
+        return; // Exit and let the timeout handle it
+    }
+
+    // Found it immediately, toggle now
+    toggleMap(mapPanel);
+
+    // Toggle function
+    function toggleMap(element) {
+        console.log('Toggling map panel:', element);
+
+        if (window.geotabMapHidden) {
+            // Show map
+            element.style.display = '';
+            window.geotabMapHidden = false;
+
+            // Save preference
+            try {
+                localStorage.setItem('hideTripsMap_state', 'visible');
+            } catch (e) {
+                console.warn('Could not save state:', e);
+            }
+
+            console.log('Map shown');
+        } else {
+            // Hide map
+            element.style.display = 'none';
+            window.geotabMapHidden = true;
+
+            // Save preference
+            try {
+                localStorage.setItem('hideTripsMap_state', 'hidden');
+            } catch (e) {
+                console.warn('Could not save state:', e);
+            }
+
+            console.log('Map hidden');
         }
-
-        console.log('Map shown');
-    } else {
-        // Hide map
-        mapPanel.style.display = 'none';
-        window.geotabMapHidden = true;
-
-        // Save preference
-        try {
-            localStorage.setItem('hideTripsMap_state', 'hidden');
-        } catch (e) {
-            console.warn('Could not save state:', e);
-        }
-
-        console.log('Map hidden');
     }
 };
 
@@ -58,19 +98,29 @@ geotab.customButtons.hideTripsMap = function(event, api, state) {
     try {
         const savedState = localStorage.getItem('hideTripsMap_state');
         if (savedState === 'hidden') {
-            // Wait for page to load, then hide map automatically
+            // Wait longer for page to fully load before auto-hiding
             setTimeout(function() {
-                const mapPanel = document.querySelector('.react-trips-history__map-panel');
-                if (mapPanel) {
-                    mapPanel.style.display = 'none';
-                    window.geotabMapHidden = true;
-                    console.log('Map auto-hidden based on saved preference');
+                const selectors = [
+                    '.react-trips-history__map-panel',
+                    '.react-trips-history__map-container',
+                    '#liveMap_mapCanvas',
+                    '.map-with-options'
+                ];
+
+                for (let selector of selectors) {
+                    const mapPanel = document.querySelector(selector);
+                    if (mapPanel) {
+                        mapPanel.style.display = 'none';
+                        window.geotabMapHidden = true;
+                        console.log('Map auto-hidden based on saved preference');
+                        break;
+                    }
                 }
-            }, 1000);
+            }, 2000);
         }
     } catch (e) {
         console.warn('Could not restore map state:', e);
     }
 })();
 
-console.log('Hide Trips Map add-in loaded (FINAL version)');
+console.log('Hide Trips Map add-in loaded (FINAL version - multi-selector)');
